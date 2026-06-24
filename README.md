@@ -1,283 +1,216 @@
-# Zurich Repeat New Business Intelligence System
-## Hackathon MVP: Leveraging Historical Data to Improve NB Decisions
+# EOS AI — Agentic AI for Underwriting
+## Zurich Hackathon MVP: Leveraging Historical Data to Improve New Business Decisions
 
-**Deadline**: 22 June 2026  
-**Team Size**: 5 roles (AI Architect, Data Engineer, Data Scientist, UW/Claims Expert, Business Analyst)  
-**Local Development**: Windows + Python 3.12, no cloud required.
+**Deadline**: 22 June 2026
+**Stack**: Python 3.12 · Streamlit · NetworkX · Claude Sonnet 4.6 · MCP · RAG
+**Local only**: no cloud required
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone & setup
-git clone <repo>
-cd c:\PROJECT
-
-# Install dependencies
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# Run data ingestion (populate cache from Dataset 1 & 2)
-python src/data/loader.py
+# 2. Configure credentials
+cp .env.example .env
+# Fill in ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
 
-# Run knowledge graph builder
-python src/models/graph_builder.py
+# 3. Run data pipeline (first time only)
+python src/business/mass_scoring.py
+python src/business/mass_deltas.py
+python scripts/build_knowledge_graph.py
+python scripts/precompute_kg.py
+python -m src.rag.guidelines_rag --build
 
-# Launch dashboard
-streamlit run app.py
+# 4. Launch demo
+python start_demo.py --mcp        # Phase 2: MCP servers + background watcher
+python start_demo.py              # Phase 1: inline tools only
+
+# 5. Stop
+python start_demo.py --stop
 ```
 
-The dashboard will open at `http://localhost:8501`.
+Dashboard opens at `http://localhost:8501`.
 
 ---
 
 ## Problem Statement
 
-**Zurich repeats submissions frequently, but treats each as "new."**
-- Same customer, same line of business (LOB), different year = we ignore prior knowledge.
-- Opportunity: detect repeats, extract historical deltas, and recommend fast-track approval for low-risk renewals.
+Zurich Specialties receives repeat submissions from the same customers year after year but treats each as new business — ignoring 5+ years of historical context. A UW currently spends 55–80 minutes per repeat submission doing manual research that EOS AI delivers in 3 minutes.
 
-**Goal**: Build an underwriting decision-support system that surfaces:
-1. Which submissions are repeat customers?
-2. What has changed (revenue, controls, risk profile)?
-3. Should this be fast-tracked or require fresh underwriting?
-4. Who are the peer customers and what was their outcome?
+**The system answers:**
+1. Is this a repeat customer? What is their full history?
+2. What changed since their last submission (controls, broker, status, premium)?
+3. Should this be Fast-Tracked, Standard UW, or Fresh UW?
+4. Who are their structural peers and what were their outcomes?
+5. What is the cascade risk to the portfolio if a hazard event occurs?
 
 ---
 
-## Solution Overview
+## Solution
 
-**Architecture**: Rule-driven system + knowledge graph + dashboard.
+**EOS AI** is an agentic AI platform with 5 pages, 18 tools, a real-time Knowledge Graph, RAG on Zurich guidelines, and an event-driven new submission watcher.
 
 ```
-Inputs:
-  - Dataset 1: Excel with 5 years of Specialties submissions (2021–2026)
-  - Dataset 2: PDF submission packages for 25 repeat Cyber customers
+Inputs
+  Dataset 1: 46,318 Specialties submissions (2021–2026)
+  Dataset 2: 162 PDFs across 25 repeat Cyber customers
 
-Processing:
-  1. Parse Excel → identify repeat customers, compute trends
-  2. Parse PDFs → extract fields (revenue, controls, policies, etc.)
-  3. Compute deltas vs baseline submission
-  4. Build knowledge graph → detect risk clusters, broker patterns, control impact
-  5. Score recommendations → FAST-TRACK | STANDARD-UW | FRESH-UW
+Processing
+  → Repeat customer detection (9,078 customers, 34% of book)
+  → PDF extraction (26 fields: revenue, controls, policies, dates)
+  → Delta computation (first vs latest submission per customer)
+  → Risk scoring (0-100 + FAST_TRACK / STANDARD_UW / FRESH_UW)
+  → Knowledge Graph (10,232 nodes, 36,312 edges, KMeans k=3)
+  → RAG index (64 chunks from Zurich UW guidelines)
 
-Outputs:
-  - Prioritized queue of 25 customers (sortable by risk, LOB, broker)
-  - Per-customer risk trajectory (2022–2026 timeline)
-  - Peer-group analysis (similar customers + approval rates)
-  - Recommendation + reasoning for each submission
-  - Dashboard + exportable reports
+Output
+  → AI Agent: 18 tools, memory, reflexion, EU AI Act governance
+  → Dashboard: 5 interactive pages
+  → Event-driven watcher: auto-analyses new PDF submissions
 ```
 
 ---
 
-## Deliverables
-
-| Phase | Timeline | Deliverable | Impact |
-|-------|----------|-------------|--------|
-| **MVP-1** | Days 1–3 | Repeat-customer analytics + Excel insights | Establishes scale of opportunity |
-| **MVP-2** | Days 4–5 | PDF parsing + delta extraction | Proves data quality + field relevance |
-| **MVP-3** | Days 6–7 | Knowledge graph + risk clusters | Shows pattern discovery depth |
-| **MVP-4** | Days 8–9 | Dashboard + recommendation engine | Live demo ready |
-| **Polish** | Days 10–12 | Slides + dry run + repo documentation | Pitch-ready |
-
----
-
-## Timeline: 10 June → 22 June (12 days)
+## Architecture
 
 ```
-Days 1–3: Data Engineering
-  - Ingest Dataset 1 (Excel) → SQLite cache
-  - Initial EDA: repeat rates by LOB, broker, cadence
-  - Deliverable: Jupyter notebook + charts
+start_demo.py --mcp
+  ├── submissions_server.py  :8601
+  ├── scoring_server.py      :8602
+  ├── kg_server.py           :8603
+  ├── watcher_server.py      :8604
+  ├── watcher.py             [background, polls folder every 30s]
+  └── Streamlit              :8501
+        app.py (~120 lines — routing + pre-warm + badge + toast)
+          ├── customer.py      Customer Intelligence: briefing banner + Queue/Drill-Down/Side-by-Side  ← LANDING
+          ├── agent.py         Ask EOS AI: MVP questions + UW workflow chat
+          ├── portfolio.py     Portfolio Analytics: charts + accuracy validation
+          ├── graph.py         Portfolio Risk Map: Customer Network/Cascade/Risk Clusters
+          └── new_submission.py New Submission: auto-scan + digital twin
+```
 
-Days 4–5: PDF Parsing & Feature Engineering
-  - Parse Dataset 2 PDFs (25 customers, 4–5 submissions each)
-  - Extract fields: revenue, employees, controls, policies, financials
-  - Compute deltas vs first submission per customer
-  - Deliverable: Parsed CSVs + per-customer delta reports
+**Startup pre-warm:** `_prewarm()` (`@st.cache_resource` in app.py) populates all `@st.cache_data` loaders on server start — first page load is instant.
 
-Days 6–7: Knowledge Graph & Risk Scoring
-  - Build NetworkX graph: nodes (customer, submission, control, broker), edges (relationships)
-  - Implement clustering: detect risk groups
-  - Compute scoring rules: revenue_delta, control_regression, decision_history
-  - Deliverable: Graph object + cluster assignments + sample recommendations
-
-Days 8–9: Dashboard & Recommendation Engine
-  - Build Streamlit dashboard:
-    - Prioritization queue (sorted by recommendation)
-    - Risk trajectories (per customer)
-    - KG insights (peers, clusters, control impact)
-  - Wire recommendation engine to dashboard
-  - Deliverable: Live demo + 5 example customers
-
-Days 10–11: Polish & Slides
-  - Dry run demo (5 min pitch)
-  - Prepare slides: problem → solution → results
-  - Document code + create usage guide
-  - Test on different machines
-  - Deliverable: Slide deck + README
-
-Day 12: Submission & Final Checks
-  - Push to GitHub
-  - Final polish on demo
-  - Ready for presentation
+**Agent loop per message:**
+```
+Memory read (customer_memory.json + decisions_log.jsonl[-100 lines])
+→ Tool discovery (_get_tools() → MCP servers via discover_mcp_tools())
+→ ReAct loop (max 10 turns, retry, error boundary, 4000-char result cap)
+  → Parallel tool execution when >1 tool called (asyncio.gather via call_tools_parallel_mcp())
+→ Reflexion (_reflect(): 2 checks, max_tokens=80 — lightweight governance audit)
+→ Log decision (decisions_log.jsonl — Art. 12 EU AI Act)
+→ Entity memory upsert (customer_memory.json)
 ```
 
 ---
 
-## Project Structure
+## Dashboard Pages
+
+| Page | Key features |
+|---|---|
+| **Customer Intelligence** *(landing)* | Daily briefing banner (expandable, "Mark read"), bind rate proof in queue header, Prioritization queue (period filter: All/7/30/90 days), Drill-Down (AI recommendation headline + UW decision capture), Side-by-Side (inline agent) |
+| **Ask EOS AI** | MVP Coverage expander (4 tabs, 12 targeted questions) + UW Workflow expander (5 tabs), newest-first chat, reasoning chain expander, inline Plotly charts (bar · pie · line · scatter · heatmap) |
+| **Portfolio Analytics** | Submission trends 2019–2025, broker performance, risk clusters, delta trajectories, recommendation accuracy chart (bind rate by tier) |
+| **Portfolio Risk Map** | Customer Network (show peers, depth 2), Cascade Simulation (Network Cascade + Ripple Effect views), Risk Clusters (bridge nodes + AI cluster explanation) |
+| **New Submission** | Auto-scan watch folder, PDF upload + extraction, digital twin peer matching, portfolio cascade impact |
+
+---
+
+## The 18 Agent Tools
+
+| Group | Tools |
+|---|---|
+| Data Curation | search_portfolio, get_customer_history, get_underwriter_patterns |
+| UW Metrics | get_risk_score, get_submission_delta, get_control_delta |
+| KG Discovery | portfolio_analytics, explain_recommendation, find_structural_peers, get_community_purity, find_cluster_bridges, get_broker_centrality, get_high_risk_central_nodes, simulate_cascade_graph |
+| Guidelines (RAG) | query_uw_guidelines |
+| Watcher | scan_new_submissions, get_pending_analyses, approve_portfolio_update |
+
+---
+
+## Memory System
+
+| Layer | Storage | Written | Read |
+|---|---|---|---|
+| Session | chat_history (session state) | Every message | Every message |
+| Episodic | decisions_log.jsonl | After every chat() | At chat() start if customer mentioned |
+| Entity | customer_memory.json | After every chat() | At chat() start if customer mentioned |
+| Semantic | RAG vector index | Once (build time) | query_uw_guidelines tool |
+
+---
+
+## EU AI Act Compliance
+
+| Article | Requirement | Status |
+|---|---|---|
+| Art. 12 | Logging & record-keeping | ✅ decisions_log.jsonl — every AI interaction logged |
+| Art. 13 | Transparency | ✅ Reflexion enforces advisory disclaimer on every response |
+| Art. 14 | Human oversight | ✅ UW Decision Capture button in Customer Drill-Down |
+| Art. 15 | Accuracy & robustness | ⚠️ Accuracy chart (bind rate by tier) exists; formal validation pending |
+| Art. 10 | Data governance | ✅ Bias analysis tab in Portfolio Analytics |
+
+**All recommendations are advisory. Human underwriter decision required.**
+
+---
+
+## Repository Structure
 
 ```
-c:\PROJECT\
-├── data/
-│   ├── raw/                      # Original datasets (Dataset1.xlsx, Dataset2_PDFs/)
-│   └── parsed/                   # Processed CSVs, SQLite cache
-├── src/
-│   ├── __init__.py
-│   ├── data/
-│   │   ├── loader.py             # Ingest Excel + PDFs
-│   │   ├── pdf_parser.py         # Extract fields from PDFs
-│   │   └── normalizer.py         # Standardize values
-│   ├── business/
-│   │   ├── models.py             # Pydantic: Submission, Customer, Delta
-│   │   ├── scoring.py            # Risk scoring rules
-│   │   ├── rules.py              # UW decision logic
-│   │   ├── delta_calc.py         # Compare submissions
-│   │   └── recommender.py        # Generate recommendations
-│   ├── models/
-│   │   ├── graph_builder.py      # Build NetworkX knowledge graph
-│   │   └── pattern_discovery.py  # Query & analyze KG
-│   └── query/
-│       └── engine.py             # Route queries to data/KG/rules
-├── notebooks/
-│   ├── 01_eda.ipynb              # Exploratory analysis (Dataset 1)
-│   └── 02_delta_analysis.ipynb   # Delta computation examples
-├── app.py                         # Streamlit dashboard (main UI)
-├── requirements.txt               # Python dependencies
-├── README.md                      # This file
-├── docs/
-│   ├── 3-pager.md                # Use case + possibilities
-│   └── ARCHITECTURE.md            # System design
-└── outputs/
-    └── (exported reports, CSVs, screenshots)
+app.py                    Streamlit entry point (~120 lines, routing + _prewarm + badge + toast)
+start_demo.py             Launch script (Phase 1 / Phase 2 --mcp / --stop)
+src/
+  agent/
+    orchestrator.py       18 tools, ReAct loop, memory, parallel tools, reflexion (MAX_TURNS=10)
+    mcp_client.py         MCP HTTP routing + discover_mcp_tools() + call_tools_parallel_mcp()
+    briefing.py           Daily briefing (uses dashboard_data.py loaders)
+    watcher.py            Event-driven PDF watcher + get_badge_count() (TTL 30s) + get_latest_pending_alert()
+  pages/
+    customer.py           Customer Intelligence — LANDING: briefing banner + bind rate + queue + drill-down
+    agent.py              Ask EOS AI: MVP Coverage expander (4 tabs) + UW Workflow expander (5 tabs)
+    portfolio.py          Portfolio Analytics (recommendation_accuracy chart + bias analysis)
+    graph.py              Portfolio Risk Map (3 views, dual cascade)
+    new_submission.py     New Submission (_auto_scan on every render)
+  mcp_servers/
+    submissions_server.py :8601 — search_portfolio, get_customer_history, get_underwriter_patterns
+    scoring_server.py     :8602 — get_risk_score, get_submission_delta, get_control_delta
+    kg_server.py          :8603 — 9 KG + RAG tools
+    watcher_server.py     :8604 — scan_new_submissions, get_pending_analyses, approve_portfolio_update
+  data/
+    dashboard_data.py     30 @st.cache_data loaders
+    pdf_parser.py         PDF field extraction (26 fields including policy dates)
+  models/
+    kg_visualisation.py   cascade_network_html, cascade_ripple_html, cluster_life_html
+    kg_graph_analytics.py NetworkX analytics, generate_graph_xai, generate_cluster_xai
+    digital_twin.py       Peer matching for new submissions
+  rag/
+    guidelines_rag.py     RAG on Zurich UW guidelines (64 chunks)
+data/
+  raw/
+    new_submissions/      Drop PDFs here — watcher auto-analyses every 30s
+    uw_guidelines/        Zurich UW guideline PDFs for RAG index
+  parsed/                 Generated CSVs, KG pickle, audit logs (gitignored recommended)
+docs/
+  ARCHITECTURE.md         System design
+  USER_MANUAL.md          Full operational documentation
+  AI_GOVERNANCE_BY_PHASE.md  EU AI Act compliance roadmap
+  3-pager.md              Original use case brief
 ```
 
 ---
 
-## Key Features
+## Data Files
 
-### 1. Repeat-Customer Detection
-- Identify customers appearing >1 time in 5-year dataset.
-- Metrics: repeat rate by LOB, by broker, by cadence (annual, biannual, etc.).
-
-### 2. Submission Delta Analysis
-- Compare each submission vs first baseline.
-- Track: revenue (↑/↓ %), employees, control maturity, security policies.
-- Highlight fields added/removed/changed.
-
-### 3. Knowledge Graph Pattern Discovery
-- **Risk Clustering**: Group customers by control + revenue profile.
-- **Broker Intelligence**: Which brokers send high-quality submissions? Approval rates?
-- **Control Impact**: Which controls predict approval? Which regressions are red flags?
-- **Anomaly Detection**: Submissions breaking their peer-group patterns.
-
-### 4. Recommendation Engine
-- Per-submission scoring: 0–100 (higher = lower risk).
-- Output: **FAST-TRACK** (score >75), **STANDARD-UW** (50–75), **FRESH-UW** (<50).
-- Reasoning: "Matches low-risk cluster (similar customers had 85% approval) + controls stable vs 2024."
-
-### 5. Interactive Dashboard
-- Sortable queue of 25 customers by recommendation + risk score.
-- Risk trajectories: timeline showing revenue, employees, controls, UW decisions.
-- Peer insights: "Similar customers" + approval rates.
-- Drill-down: click customer → all submissions + deltas + KG cluster details.
-
----
-
-## Technology Stack
-
-| Component | Tool | Rationale |
-|-----------|------|-----------|
-| Data Processing | pandas, openpyxl, pypdf | Standard, lightweight, local |
-| Data Models | Pydantic | Type safety + validation |
-| Knowledge Graph | NetworkX | Local, fast, no server overhead |
-| Scoring + ML | scikit-learn | Simple rules + optional anomaly detection |
-| Dashboard | Streamlit | Minimal code, interactive, shareable |
-| Database | SQLite | Fast local cache, no setup |
-| Optional: NLU | spaCy | Lightweight intent classification (future) |
-| Optional: Explainability | Claude API | Generate narrative explanations (future) |
-
----
-
-## Success Criteria (for Judges)
-
-- ✅ **Repeat-customer prevalence**: Show metric — "X% of submissions are repeats; here's where concentrated."
-- ✅ **Data quality**: Successfully parsed 25 customers with 4–5 submissions each; fields validated.
-- ✅ **Knowledge graph insights**: Demonstrate clustering + peer-group analysis on real examples.
-- ✅ **Actionable recommendations**: For 5+ example customers, show why → FAST-TRACK vs FRESH-UW.
-- ✅ **Interactive demo**: Judges can click dashboard, see deltas, understand logic.
-- ✅ **Clean repo**: Code readable, documented, reproducible on judge's local machine.
-
----
-
-## Getting Data Ready
-
-### Dataset 1 (Excel): Specialties Submissions 2021–2026
-- File: `data/raw/Dataset1.xlsx` or similar
-- Expected columns: Company, Effective Date, NAICS, SIC, Product, Broker, Status, Quoted Premium
-- First task: `src/data/loader.py` reads this → SQLite
-
-### Dataset 2 (PDFs): 25 Repeat Cyber Customers
-- Folder: `data/raw/Dataset2_PDFs/Customer_001/`, `Customer_002/`, etc.
-- Each folder: 4–5 PDF submission applications (2021–2026)
-- Second task: `src/data/pdf_parser.py` extracts fields → CSVs
-
-**To get started:**
-1. Place `Dataset1.xlsx` in `data/raw/`
-2. Place PDF folders in `data/raw/Dataset2_PDFs/`
-3. Run `python src/data/loader.py`
-
----
-
-## Roles & Responsibilities
-
-| Role | Tasks |
-|------|-------|
-| **AI Solution Architect** | Define scope, data contracts, system design; oversee integration; demo narrative |
-| **Data Engineer** | Build ingestion pipelines (Excel, PDF), normalize data, maintain SQLite cache |
-| **Data Scientist** | EDA, feature engineering, scoring rules, KG analysis, model evaluation |
-| **UW/Claims Expert** | Validate extracted fields, define scoring rules, test recommendations, domain expertise |
-| **Business Analyst** | Craft demo story, prepare slides, ensure outputs answer UW questions, business messaging |
-
----
-
-## Escape Hatches (if running behind)
-
-- **If PDF parsing is slow**: pre-parse a subset (5 customers) to demo; show full parsing runs async.
-- **If KG is taking too long**: ship Tier 1 (scoring + dashboard) without KG; still competitive.
-- **If dashboard is complex**: export CSVs + static HTML reports; judges can open in browser.
-
----
-
-## Next Steps
-
-1. **Data Readiness**: Place Dataset 1 & 2 in `data/raw/`.
-2. **Run Setup**: `pip install -r requirements.txt`
-3. **Day 1 Sprint**: Data loading + EDA notebook.
-4. **Sync Daily**: Track progress against 12-day timeline; identify blockers early.
-
----
-
-## Contact & Notes
-
-- **Architecture**: See `docs/ARCHITECTURE.md`
-- **Use Case**: See `docs/3-pager.md`
-- **Questions**: Refer to inline code comments + docstrings.
-- **Demo**: Streamlit app runs locally; judges can run `streamlit run app.py` after `pip install -r requirements.txt`.
-
----
-
-**Generated**: 10 June 2026  
-**Team**: Zurich Hackathon Participants  
-**Mission**: Make underwriting smarter, faster, more explainable.
+| File | Content | Size |
+|---|---|---|
+| all_submissions.csv | Full submission universe | 46,318 rows |
+| all_recommendations.csv | Risk scores + FAST/STD/FRESH | 9,078 rows |
+| all_deltas.csv | First→latest deltas per customer | 9,078 rows |
+| knowledge_graph.pkl | NetworkX MultiGraph | 10,232 nodes, 36,312 edges |
+| graph_metrics.csv | PageRank, cluster, risk score | 9,078 rows |
+| pdf_extracted_fields.csv | Controls + dates from PDFs | 162 rows (25 companies) |
+| decisions_log.jsonl | AI interactions audit trail (Art.12) | grows |
+| customer_memory.json | Entity memory per customer | grows |
+| pending_analysis.json | Watcher queue | grows |
