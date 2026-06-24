@@ -1,0 +1,46 @@
+# Secrets — NEVER commit
+.env
+*.env
+*.key
+*.pem
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Data — raw datasets may contain PII or be too large for git
+data/raw/
+data/parsed/
+*.pkl
+*.jsonl
+logs/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Temp / scratch files
+pdf_extracted.txt
+hello.py
+
+# Internal planning (not for public repo)
+SPRINT_PROGRESS.md
+
+# Build
+dist/
+build/
+*.egg-info/
