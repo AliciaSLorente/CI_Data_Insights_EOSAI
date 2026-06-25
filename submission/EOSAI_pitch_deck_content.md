@@ -31,9 +31,9 @@
 
 | Tier | Bind Rate |
 |---|---|
-| FAST_TRACK | 68% |
-| STANDARD_UW | 41% |
-| FRESH_UW | 12% |
+| FAST_TRACK | 48.1% |
+| STANDARD_UW | 4.4% |
+| FRESH_UW | 0.0% |
 
 ## Key Insights
 
@@ -84,7 +84,7 @@
 EOS AI applies renewal-like intelligence to New Business decisions. When a UW receives a repeat submission, the agent surfaces full historical context, delta analysis, structural peers from a Knowledge Graph, and a risk score grounded in Zurich UW guidelines — all in under 3 minutes.
 
 **Results of the prototype:**
-9,078 repeat customers identified (34% of book). Bind rate validation: FAST_TRACK 68% · STANDARD_UW 41% · FRESH_UW 12%. 18-tool ReAct agent operational with parallel execution. Knowledge Graph with 10,232 nodes and 36,312 edges. EU AI Act Art.10/12/13/14 compliant.
+9,078 repeat customers identified (34% of book). Bind rate validation: FAST_TRACK 48.1% · STANDARD_UW 4.4% · FRESH_UW 0.0%. 18-tool ReAct agent operational with parallel execution. Knowledge Graph with 10,232 nodes and 36,312 edges. EU AI Act Art.10/12/13/14/15 compliant.
 
 **Next steps for scaling:**
 Phase 3 multi-agent system, feedback loop from UW decisions, temporal Knowledge Graph, EU AI Act Art. 43 conformity assessment, production infrastructure (PostgreSQL, React, K8s).

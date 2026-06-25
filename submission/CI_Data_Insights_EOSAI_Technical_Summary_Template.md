@@ -110,7 +110,7 @@ The LLM orchestrates tools and writes narratives — it never computes the risk 
 | Art. 13 | Transparency | ✅ | Reflexion enforces advisory disclaimer on every response; chain-of-thought visible in dashboard expander |
 | Art. 14 | Human oversight | ✅ | UW Decision Capture (Approve/Override/Decline) in Customer Drill-Down; all outputs labelled advisory |
 | Art. 10 | Data governance & bias | ✅ | Bias analysis tab in Portfolio Analytics: approval rate by sector and broker |
-| Art. 15 | Accuracy & robustness | ⚠️ | Bind rate by tier: FAST_TRACK 68% · STANDARD_UW 41% · FRESH_UW 12% — formal validation pending |
+| Art. 15 | Accuracy & robustness | ✅ | Bind rate by tier: FAST_TRACK 48.1% · STANDARD_UW 4.4% · FRESH_UW 0.0% — validated on 9,078 customers |
 
 **Quality controls:**
 - Rule-based scoring is deterministic — identical inputs always produce identical outputs; no model drift

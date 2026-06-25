@@ -25,7 +25,7 @@ Let me show you the dashboard.
 
 The landing page is Customer Intelligence. The first thing the UW sees is the daily briefing — portfolio health, critical risk accounts, pending submissions — generated automatically each morning.
 
-In the Prioritization Queue, the UW sees all 9,000+ customers ranked by risk tier. The bind rate proof is right there at the top: Fast-Track customers bind at 68%, Fresh UW at 12%. That's the Art. 15 EU AI Act validation built directly into the workflow.
+In the Prioritization Queue, the UW sees all 9,000+ customers ranked by risk tier. The bind rate proof is right there at the top: Fast-Track customers bind at 48.1%, Fresh UW at 0%. That's the Art. 15 EU AI Act validation built directly into the workflow.
 
 Clicking into a customer shows the full Drill-Down: risk score with waterfall breakdown, delta since last submission, controls evolution, structural peers from the Knowledge Graph. The UW captures their decision — Approve, Override, or Decline — which feeds directly into the audit log.
 

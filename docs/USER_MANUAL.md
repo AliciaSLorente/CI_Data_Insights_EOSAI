@@ -157,7 +157,7 @@ The first page the UW sees on opening the app.
 - "Mark read" collapses the banner for the rest of the session
 
 **Prioritization Queue tab**
-- Model validation bar at top: **FAST_TRACK bind: 68% · STANDARD_UW: 41% · FRESH_UW: 12%** (EU AI Act Art.15 proof)
+- Model validation bar at top: **FAST_TRACK bind: 48.1% · STANDARD_UW: 4.4% · FRESH_UW: 0.0%** (EU AI Act Art.15 proof)
 - Full portfolio queue (9,078 customers) with sort + period filter (All / Last 7 / 30 / 90 days)
 - Metrics from full dataset: Total / Fast-Track / Standard UW / Fresh UW counts
 - Recommendation distribution pie + risk score histogram with thresholds
